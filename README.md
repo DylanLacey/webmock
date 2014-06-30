@@ -464,6 +464,36 @@ WebMock.disable_net_connect!(:allow => [/ample.org/, /googl/])
 RestClient.get('www.example.org', '/')    # ===> Allowed
 ```
 
+### Requests can be always allowed, even when toggling disable_net_connect
+
+```ruby
+WebMock.always_allow(['www.something.com', 'www.another_thing.co.uk'])
+
+WebMock.disable_net_connect!(:allow => /ample.org/)
+
+RestClient.get('www.something.com', '/')     # ===> Success
+
+RestClient.get('www.example.org', '/')     # ===> Success
+```
+
+### The globally allowed list can be erased or force-ignored
+
+```ruby
+WebMock.always_allow(['www.something.com', 'www.another_thing.co.uk'])
+
+WebMock.clear_always_allowed_list
+
+WebMock.disable_net_connect!
+
+RestClient.get('www.something.com', '/')     # ===> Failure
+
+WebMock.always_allow(['www.something.com', 'www.another_thing.co.uk'])
+
+WebMock.disable_net_connect!(:ignore_global_allow_list => true)
+
+RestClient.get('www.something.com', '/')     # ===> Failure
+```
+
 ## Connecting on Net::HTTP.start
 
 HTTP protocol has 3 steps: connect, request and response (or 4 with close). Most Ruby HTTP client libraries
