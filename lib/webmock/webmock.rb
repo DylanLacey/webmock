@@ -49,8 +49,22 @@ module WebMock
   def self.disable_net_connect!(options = {})
     Config.instance.allow_net_connect = false
     Config.instance.allow_localhost = options[:allow_localhost]
-    Config.instance.allow = options[:allow]
     Config.instance.net_http_connect_on_start = options[:net_http_connect_on_start]
+
+    options = [options.fetch(:allow, [])].flatten + always_allowed
+    Config.instance.allow = options
+  end
+
+  def self.always_allowed
+    @always_allowed ||= []
+  end
+
+  def self.clear_always_allowed_list
+    @always_allowed = []
+  end
+
+  def self.always_allow(items)
+    @always_allowed = always_allowed + [items].flatten
   end
 
   def self.net_connect_allowed?(uri = nil)
@@ -78,6 +92,7 @@ module WebMock
   def self.reset!
     WebMock::RequestRegistry.instance.reset!
     WebMock::StubRegistry.instance.reset!
+    WebMock.clear_always_allowed_list
   end
 
   def self.reset_webmock
