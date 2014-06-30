@@ -142,64 +142,136 @@ shared_context "allowing and disabling net connect" do |*adapter_info|
     describe "is not allowed with global exception for allowed domains" do
       let(:host_with_port){ WebMockServer.instance.host_with_port }
 
-      before(:each) do
-        WebMock.always_allow ["www.example.org", "httpstat.us", host_with_port]
-        WebMock.disable_net_connect!
+      context "without the ignore_global_allow_list option" do
+        before(:each) do
+          WebMock.always_allow ["www.example.org", "httpstat.us", host_with_port]
+          WebMock.disable_net_connect!
+        end
+
+        after(:each) do
+          WebMock.clear_always_allowed_list
+        end
+
+        context "when the host is not allowed" do
+          it "should return stubbed response if request was stubbed" do
+            stub_request(:get, "www.example.com").to_return(:body => "abc")
+            http_request(:get, "http://www.example.com/").body.should == "abc"
+          end
+
+          it "should raise exception if request was not stubbed" do
+            lambda {
+              http_request(:get, "http://www.example.com/")
+            }.should raise_error(WebMock::NetConnectNotAllowedError, %r(Real HTTP connections are disabled. Unregistered request: GET http://www.example.com/))
+          end
+        end
+
+        context "when the host with port is not allowed" do
+          it "should return stubbed response if request was stubbed" do
+            stub_request(:get, "http://localhost:2345").to_return(:body => "abc")
+            http_request(:get, "http://localhost:2345/").body.should == "abc"
+          end
+
+          it "should raise exception if request was not stubbed" do
+            lambda {
+              http_request(:get, "http://localhost:2345/")
+            }.should raise_error(WebMock::NetConnectNotAllowedError, %r(Real HTTP connections are disabled. Unregistered request: GET http://localhost:2345/))
+          end
+        end
+
+        context "when the host is allowed" do
+          it "should raise exception if request was not stubbed" do
+            lambda {
+              http_request(:get, "http://www.example.com/")
+            }.should raise_error(WebMock::NetConnectNotAllowedError, %r(Real HTTP connections are disabled. Unregistered request: GET http://www.example.com/))
+          end
+
+          it "should make a real request to allowed host", :net_connect => true do
+            http_request(:get, "http://httpstat.us/200").status.should == "200"
+          end
+        end
+
+        context "when the host with port is allowed" do
+          it "should make a real request to allowed host", :net_connect => true do
+            http_request(:get, "http://#{host_with_port}/").status.should == "200"
+          end
+        end
+
+        context "when the host is allowed but not port" do
+          it "should make a real request to allowed host", :net_connect => true do
+            lambda {
+              http_request(:get, "http://localhost:123/")
+            }.should raise_error(WebMock::NetConnectNotAllowedError, %r(Real HTTP connections are disabled. Unregistered request: GET http://localhost:123/))
+          end
+        end
       end
 
-      after(:each) do
-        WebMock.clear_always_allowed_list
-      end
-
-      context "when the host is not allowed" do
-        it "should return stubbed response if request was stubbed" do
-          stub_request(:get, "www.example.com").to_return(:body => "abc")
-          http_request(:get, "http://www.example.com/").body.should == "abc"
+      context "with the ignore_global_allow_list option" do
+        before(:each) do
+          WebMock.always_allow ["www.example.org", "www.example.co.uk"]
+          WebMock.disable_net_connect!(:ignore_global_allow_list => true, :allow => ["httpstat.us", host_with_port])
         end
 
-        it "should raise exception if request was not stubbed" do
-          lambda {
-            http_request(:get, "http://www.example.com/")
-          }.should raise_error(WebMock::NetConnectNotAllowedError, %r(Real HTTP connections are disabled. Unregistered request: GET http://www.example.com/))
-        end
-      end
-
-      context "when the host with port is not allowed" do
-        it "should return stubbed response if request was stubbed" do
-          stub_request(:get, "http://localhost:2345").to_return(:body => "abc")
-          http_request(:get, "http://localhost:2345/").body.should == "abc"
+        after(:each) do
+          WebMock.clear_always_allowed_list
         end
 
-        it "should raise exception if request was not stubbed" do
-          lambda {
-            http_request(:get, "http://localhost:2345/")
-          }.should raise_error(WebMock::NetConnectNotAllowedError, %r(Real HTTP connections are disabled. Unregistered request: GET http://localhost:2345/))
-        end
-      end
+        context "when the host is not allowed" do
+          it "should return stubbed response if request was stubbed" do
+            stub_request(:get, "www.example.com").to_return(:body => "abc")
+            http_request(:get, "http://www.example.com/").body.should == "abc"
+          end
 
-      context "when the host is allowed" do
-        it "should raise exception if request was not stubbed" do
-          lambda {
-            http_request(:get, "http://www.example.com/")
-          }.should raise_error(WebMock::NetConnectNotAllowedError, %r(Real HTTP connections are disabled. Unregistered request: GET http://www.example.com/))
+          it "should raise exception if request was not stubbed" do
+            lambda {
+              http_request(:get, "http://www.example.com/")
+            }.should raise_error(WebMock::NetConnectNotAllowedError, %r(Real HTTP connections are disabled. Unregistered request: GET http://www.example.com/))
+          end
         end
 
-        it "should make a real request to allowed host", :net_connect => true do
-          http_request(:get, "http://httpstat.us/200").status.should == "200"
-        end
-      end
+        context "when the host with port is not allowed" do
+          it "should return stubbed response if request was stubbed" do
+            stub_request(:get, "http://localhost:2345").to_return(:body => "abc")
+            http_request(:get, "http://localhost:2345/").body.should == "abc"
+          end
 
-      context "when the host with port is allowed" do
-        it "should make a real request to allowed host", :net_connect => true do
-          http_request(:get, "http://#{host_with_port}/").status.should == "200"
+          it "should raise exception if request was not stubbed" do
+            lambda {
+              http_request(:get, "http://localhost:2345/")
+            }.should raise_error(WebMock::NetConnectNotAllowedError, %r(Real HTTP connections are disabled. Unregistered request: GET http://localhost:2345/))
+          end
         end
-      end
 
-      context "when the host is allowed but not port" do
-        it "should make a real request to allowed host", :net_connect => true do
-          lambda {
-            http_request(:get, "http://localhost:123/")
-          }.should raise_error(WebMock::NetConnectNotAllowedError, %r(Real HTTP connections are disabled. Unregistered request: GET http://localhost:123/))
+        context "when the host is only allowed in the global list only" do
+          it "should return stubbed response if request was stubbed" do
+            stub_request(:get, "www.example.com").to_return(:body => "abc")
+            http_request(:get, "http://www.example.com/").body.should == "abc"
+          end
+
+          it "should raise exception if request was not stubbed" do
+            lambda {
+              http_request(:get, "http://www.example.org/")
+            }.should raise_error(WebMock::NetConnectNotAllowedError, %r(Real HTTP connections are disabled. Unregistered request: GET http://www.example.org/))
+          end
+        end
+
+        context "when the host is allowed" do
+          it "should make a real request to allowed host" do
+            http_request(:get, "http://httpstat.us/200").status.should == "200"
+          end
+        end
+
+        context "when the host with port is allowed" do
+          it "should make a real request to allowed host", :net_connect => true do
+            http_request(:get, "http://#{host_with_port}/").status.should == "200"
+          end
+        end
+
+        context "when the host is allowed but not port" do
+          it "should make a real request to allowed host", :net_connect => true do
+            lambda {
+              http_request(:get, "http://localhost:123/")
+            }.should raise_error(WebMock::NetConnectNotAllowedError, %r(Real HTTP connections are disabled. Unregistered request: GET http://localhost:123/))
+          end
         end
       end
     end

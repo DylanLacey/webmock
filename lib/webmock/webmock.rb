@@ -51,8 +51,9 @@ module WebMock
     Config.instance.allow_localhost = options[:allow_localhost]
     Config.instance.net_http_connect_on_start = options[:net_http_connect_on_start]
 
-    options = [options.fetch(:allow, [])].flatten + always_allowed
-    Config.instance.allow = options
+    allows = [options.fetch(:allow, [])].flatten
+    allows = allows + always_allowed unless options[:ignore_global_allow_list]
+    Config.instance.allow = allows
   end
 
   def self.always_allowed
